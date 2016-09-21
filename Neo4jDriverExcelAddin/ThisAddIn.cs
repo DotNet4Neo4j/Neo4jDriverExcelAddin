@@ -3,6 +3,8 @@
 namespace Neo4jDriverExcelAddin
 {
     using System;
+    using System.Globalization;
+    using System.Linq;
     using Microsoft.Office.Interop.Excel;
     using Microsoft.Office.Tools;
     using Neo4j.Driver.V1;
@@ -22,11 +24,15 @@ namespace Neo4jDriverExcelAddin
 
         private void RibbonShowHide(object sender, EventArgs e)
         {
+            bool forceVisible = false;
             if (_customTaskPane == null)
+            {
                 InitializePane();
+                forceVisible = true;
+            }
 
             if (_customTaskPane != null)
-                _customTaskPane.Visible = !_customTaskPane.Visible;
+                _customTaskPane.Visible = forceVisible || !_customTaskPane.Visible;
         }
 
         private void ThisAddIn_Startup(object sender, EventArgs e)
@@ -86,19 +92,57 @@ namespace Neo4jDriverExcelAddin
             }
         }
 
+        internal ExecuteQuery CurrentControl => _customTaskPane.Control as ExecuteQuery;
+
+        /// <summary>
+        /// Gets the appropriate Excel column name given a number index.
+        /// </summary>
+        /// <remarks>Initial source: http://stackoverflow.com/questions/4583191/incrementation-of-char </remarks>
+        private static string GetColNameFromIndex(int columnNumber)
+        {
+            int dividend = columnNumber;
+            string columnName = string.Empty;
+
+            while (dividend > 0)
+            {
+                var modulo = (dividend - 1) % 26;
+                columnName = Convert.ToChar(65 + modulo) + columnName;
+                dividend = (dividend - modulo) / 26;
+            }
+
+            return columnName;
+        }
+
+
         private void ExecuteCypher(object sender, ExecuteCypherQueryArgs e)
         {
-            var worksheet = ((Worksheet) Application.ActiveSheet);
-           
-            using (var session = _driver.Session())
+            try
             {
-                var result = session.Run(e.Cypher);
-                int row = 1;
-                foreach (var record in result)
+                var worksheet = ((Worksheet) Application.ActiveSheet);
+
+                using (var session = _driver.Session())
                 {
-                    var range = worksheet.Range[$"A{row++}"]; //TODO: Hard coded range
-                    range.Value2 = record["UserId"].As<string>(); //TODO: Hard coded 'UserId' here.
+                    var result = session.Run(e.Cypher);
+                    bool isFirstRow = true;
+                    int row = 2;
+                    foreach (var record in result)
+                    {
+                        for (int i = 0; i < record.Keys.Count; i++)
+                        {
+                            var colName = GetColNameFromIndex(i + 1);
+                            var key = record.Keys[i];
+                            if (isFirstRow)
+                                worksheet.Range[$"{colName}1"].Value2 = key;
+                            worksheet.Range[$"{colName}{row}"].Value2 = record.Values[key].As<string>();
+                        }
+                        row++;
+                        isFirstRow = false;
+                    }
                 }
+            }
+            catch (Neo4jException ex)
+            {
+                CurrentControl.SetMessage(ex.Message);
             }
         }
 

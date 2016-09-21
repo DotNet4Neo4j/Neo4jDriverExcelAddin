@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Drawing;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-
-namespace Neo4jDriverExcelAddin
+﻿namespace Neo4jDriverExcelAddin
 {
+    using System;
+    using System.Windows.Forms;
+
     public partial class ExecuteQuery : UserControl
     {
         public ExecuteQuery()
@@ -28,6 +21,11 @@ namespace Neo4jDriverExcelAddin
                 return;
 
             ExecuteCypher?.Invoke(this, new ExecuteCypherQueryArgs {Cypher = cypher});
+        }
+
+        public void SetMessage(string message)
+        {
+            txtNeoResponse.Text = message;
         }
     }
 }
